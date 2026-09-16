@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finance AI Agent — Console</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0c1018;
+    --panel: #141a26;
+    --panel-2: #1b2331;
+    --line: #26303f;
+    --text: #e7ecf3;
+    --muted: #8c99ac;
+    --accent: #4ade9f;
+    --accent-dim: #1d4d3a;
+    --warn: #f2b955;
+    --danger: #f2686b;
+    --info: #63b3f5;
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 16px 48px;
+    background: radial-gradient(1200px 600px at 20% -10%, #17223a 0%, var(--bg) 60%);
+    color: var(--text);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    max-width: 1240px; margin: 0 auto; padding: 22px 0 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1 1 auto; }
+  .conn {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 5px 11px; border-radius: 999px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); transition: background .2s; }
+  .conn.live .dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(74,222,159,.15); }
+
+  /* ---------- layout ---------- */
+  .wrap {
+    max-width: 1240px; margin: 0 auto; padding-block: 22px;
+    display: grid; gap: 20px; grid-template-columns: 340px minmax(0, 1fr);
+    align-items: start;
+  }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px;
+  }
+  aside.panel { position: sticky; top: 16px; }
+  @media (max-width: 900px) { aside.panel { position: static; } }
+
+  h2.title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--muted); margin: 0 0 14px; font-weight: 600;
+  }
+
+  /* ---------- form ---------- */
+  label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 5px; }
+  .field { margin-bottom: 14px; }
+  input[type="text"], input[type="number"] {
+    width: 100%; padding: 9px 11px; font: inherit; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+    outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: #566378; }
+
+  .exp-row { display: grid; grid-template-columns: 1fr 96px 30px; gap: 7px; margin-bottom: 7px; }
+  .icon-btn {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+    border-radius: 9px; cursor: pointer; font-size: 15px; line-height: 1; transition: .15s;
+  }
+  .icon-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  button.ghost {
+    width: 100%; margin-top: 4px; padding: 8px; font: inherit; cursor: pointer;
+    background: transparent; border: 1px dashed var(--line); color: var(--muted);
+    border-radius: 9px; transition: .15s;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--accent); }
+
+  button.primary {
+    width: 100%; margin-top: 16px; padding: 11px; font: inherit; font-weight: 600;
+    cursor: pointer; border: none; border-radius: 10px;
+    background: var(--accent); color: #062015; transition: .15s;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+
+  .tally {
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  .tally div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .tally b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .tally .pos b { color: var(--accent); }
+  .tally .neg b { color: var(--danger); }
+
+  /* ---------- cards ---------- */
+  .deck { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; min-height: 150px;
+    transition: transform .28s ease, opacity .28s ease, border-color .2s;
+    transform-origin: center; backface-visibility: hidden;
+  }
+  .card.flipping { transform: rotateY(90deg); opacity: .25; }
+  .card.enter { animation: flipIn .45s cubic-bezier(.3,.8,.3,1) both; }
+  @keyframes flipIn {
+    from { transform: rotateY(-75deg) translateY(8px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+  .card.pending { opacity: .5; }
+  .card.busy { border-color: var(--info); }
+
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .card-head .n {
+    width: 20px; height: 20px; flex: none; border-radius: 6px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    font: 600 10px/18px var(--mono); text-align: center; color: var(--muted);
+  }
+  .card-head h3 { font-size: 13px; margin: 0; font-weight: 600; }
+  .card-head .who { font-size: 11px; color: var(--muted); }
+  .flip-btn {
+    margin-left: auto; background: transparent; border: 1px solid var(--line);
+    color: var(--muted); border-radius: 7px; padding: 2px 7px;
+    font: 11px/1.4 var(--mono); cursor: pointer; transition: .15s;
+  }
+  .flip-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .chip {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font: 600 10px/1.7 var(--mono); letter-spacing: .04em;
+    border: 1px solid; margin: 0 5px 5px 0;
+  }
+  .chip.ok    { color: var(--accent); border-color: var(--accent-dim); background: rgba(74,222,159,.09); }
+  .chip.warn  { color: var(--warn);   border-color: #5a4520; background: rgba(242,185,85,.09); }
+  .chip.bad   { color: var(--danger); border-color: #5c2a2c; background: rgba(242,104,107,.09); }
+  .chip.neut  { color: var(--muted);  border-color: var(--line); background: var(--panel-2); }
+
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #1d2532; font-size: 13px; }
+  .kv:last-child { border-bottom: none; }
+  .kv span { color: var(--muted); }
+  .kv b { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .prose { font-size: 13px; white-space: pre-wrap; color: #cfd8e5; }
+  .empty { color: #5b6879; font-size: 12.5px; font-style: italic; }
+
+  .risk { border-left: 2px solid var(--line); padding: 4px 0 4px 10px; margin-bottom: 10px; }
+  .risk.HIGH_RISK { border-color: var(--danger); }
+  .risk.MODERATE_RISK { border-color: var(--warn); }
+  .risk.LOW_RISK { border-color: var(--accent); }
+  .risk .why { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .risk .txt { font-size: 12.5px; color: #cfd8e5; }
+
+  .recs { margin: 10px 0 0; padding-left: 18px; font-size: 13px; color: #cfd8e5; }
+  .recs li { margin-bottom: 5px; }
+  .recs li::marker { color: var(--accent); }
+  .notes { margin: 10px 0 0; padding-left: 16px; font-size: 12px; color: var(--muted); }
+  .notes li { margin-bottom: 4px; }
+
+  pre.json {
+    margin: 0; padding: 11px; background: #0a0e15; border: 1px solid var(--line);
+    border-radius: 9px; font: 11.5px/1.5 var(--mono); color: #9fb4cc;
+    max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ---------- chat ---------- */
+  .chat { margin-top: 18px; }
+  .thread { display: grid; gap: 10px; margin-bottom: 14px; }
+  .msg { padding: 10px 13px; border-radius: 11px; font-size: 13px; max-width: 78%; }
+  .msg.user { background: var(--accent-dim); color: #d8f7e8; justify-self: end; border-bottom-right-radius: 3px; }
+  .msg.bot  { background: var(--panel-2); border: 1px solid var(--line); justify-self: start; border-bottom-left-radius: 3px; white-space: pre-wrap; }
+  .msg.bot .meta { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); }
+  .msg.pendingdots::after { content: "..."; animation: dots 1.2s steps(4, end) infinite; color: var(--muted); }
+  @keyframes dots { 0% { content: "."; } 33% { content: ".."; } 66% { content: "..."; } }
+  .ask-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+  .ask-row button {
+    padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 9px; transition: .15s;
+  }
+  .ask-row button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .ask-row button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- demo scenarios ---------- */
+  .scenarios { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .scenarios .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin-right: 4px; }
+  .scn {
+    padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 999px; transition: .15s;
+  }
+  .scn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .scn.risky:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+  .scn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- pipeline strip ---------- */
+  .pipeline {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 10px; margin-bottom: 16px;
+  }
+  .stage { position: relative; text-align: center; padding: 0 4px; }
+  .stage::after {
+    content: ""; position: absolute; top: 13px; left: calc(50% + 18px); right: calc(-50% + 18px);
+    height: 2px; background: var(--line); transition: background .3s;
+  }
+  .stage:last-child::after { display: none; }
+  .stage.done::after { background: var(--accent-dim); }
+  .stage .bub {
+    width: 28px; height: 28px; margin: 0 auto 6px; border-radius: 50%;
+    display: grid; place-items: center; font: 600 12px var(--mono);
+    background: var(--panel-2); border: 2px solid var(--line); color: var(--muted); transition: .25s;
+  }
+  .stage .nm { font-size: 12px; font-weight: 600; }
+  .stage .st { font-size: 11px; color: var(--muted); min-height: 1.4em; }
+  .stage.running .bub { border-color: var(--info); color: var(--info); animation: pulse 1.1s ease-in-out infinite; }
+  .stage.done .bub    { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+  .stage.blocked .bub { border-color: var(--danger); background: rgba(242,104,107,.15); color: var(--danger); }
+  .stage.error .bub   { border-color: var(--warn); color: var(--warn); }
+  .stage.scripted .bub { border-color: var(--warn); border-style: dashed; color: var(--warn); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(99,179,245,.45); } 50% { box-shadow: 0 0 0 7px rgba(99,179,245,0); } }
+  @media (max-width: 520px) { .stage .st { display: none; } .stage .nm { font-size: 11px; } }
+
+  .ms { margin-left: auto; font: 11px var(--mono); color: var(--muted); }
+  .ms + .flip-btn { margin-left: 8px; }
+
+  .banner {
+    margin: 0 0 16px; padding: 11px 14px; border-radius: 10px; font-size: 13px;
+    background: rgba(242,104,107,.1); border: 1px solid #5c2a2c; color: #ffc2c3;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Finance AI Agent</h1>
+  <span class="sub">Agent 1 (Gemini) → Agent 2 (Privacy &amp; Risk Guard)</span>
+  <span class="spacer"></span>
+  <span class="conn" id="conn"><span class="dot"></span><span id="conn-text">connecting…</span></span>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ INPUT ============ -->
+  <aside class="panel">
+    <h2 class="title">Your numbers</h2>
+
+    <div class="field">
+      <label for="income">Monthly income (EUR)</label>
+      <input type="number" id="income" min="0" step="10" placeholder="2400" value="2400">
+    </div>
+
+    <div class="field">
+      <label for="goal">Saving goal this month (EUR)</label>
+      <input type="number" id="goal" min="0" step="10" placeholder="400" value="400">
+    </div>
+
+    <div class="field">
+      <label>Expenses</label>
+      <div id="expenses"></div>
+      <button class="ghost" id="add-exp" type="button">+ Add expense</button>
+    </div>
+
+    <button class="primary" id="run" type="button" disabled>Run pipeline</button>
+
+    <div class="tally">
+      <div><span>Total spent</span><b id="t-spent">—</b></div>
+      <div><span>Remaining</span><b id="t-remaining">—</b></div>
+      <div id="t-buffer-row"><span>After goal</span><b id="t-buffer">—</b></div>
+    </div>
+  </aside>
+
+  <!-- ============ OUTPUT ============ -->
+  <main>
+    <div class="scenarios">
+      <span class="lbl">Demo</span>
+      <button class="scn" type="button" data-scenario="healthy">Healthy month</button>
+      <button class="scn" type="button" data-scenario="tight">Tight month</button>
+      <button class="scn" type="button" data-scenario="privacy">Private data in expenses</button>
+      <button class="scn risky" type="button" data-scenario="risky">Risky draft → guard test</button>
+    </div>
+
+    <div class="pipeline" id="pipeline">
+      <div class="stage" data-stage="input"><div class="bub">1</div><div class="nm">Your input</div><div class="st">waiting</div></div>
+      <div class="stage" data-stage="agent1"><div class="bub">2</div><div class="nm">Agent 1 · Gemini</div><div class="st">idle</div></div>
+      <div class="stage" data-stage="agent2"><div class="bub">3</div><div class="nm">Agent 2 · Guard</div><div class="st">idle</div></div>
+      <div class="stage" data-stage="output"><div class="bub">4</div><div class="nm">User sees</div><div class="st">idle</div></div>
+    </div>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <div class="deck">
+
+      <!-- Card 1: deterministic math -->
+      <section class="card pending" id="card-math" data-raw="{}">
+        <div class="card-head">
+          <span class="n">1</span>
+          <div><h3>Budget math</h3><div class="who">calculate_financials() — no model involved</div></div>
+          <button class="flip-btn" data-flip="card-math">{ }</button>
+        </div>
+        <div class="face" id="face-math"><p class="empty">Enter your numbers and run the pipeline.</p></div>
+      </section>
+
+      <!-- Card 2: Agent 1 -->
+      <section class="card pending" id="card-a1" data-raw="{}">
+        <div class="card-head">
+          <span class="n">2</span>
+          <div><h3>Agent 1 · draft</h3><div class="who" id="a1-model">Gemini</div></div>
+          <span class="ms" id="ms-a1"></span>
+          <button class="flip-btn" data-flip="card-a1">{ }</button>
+        </div>
+        <div class="face" id="face-a1"><p class="empty">Waiting for Agent 1…</p></div>
+      </section>
+
+      <!-- Card 3: Agent 2 -->
+      <section class="card pending" id="card-a2" data-raw="{}">
+        <div class="card-head">
+          <span class="n">3</span>
+          <div><h3>Agent 2 · review</h3><div class="who">Privacy &amp; Risk Guard (deterministic)</div></div>
+          <span class="ms" id="ms-a2"></span>
+          <button class="flip-btn" data-flip="card-a2">{ }</button>
+        </div>
+        <div class="face" id="face-a2"><p class="empty">Waiting for Agent 2…</p></div>
+      </section>
+
+      <!-- Card 4: final -->
+      <section class="card pending" id="card-final" data-raw="{}">
+        <div class="card-head">
+          <span class="n">4</span>
+          <div><h3>What you see</h3><div class="who">post-guard output</div></div>
+          <button class="flip-btn" data-flip="card-final">{ }</button>
+        </div>
+        <div class="face" id="face-final"><p class="empty">Nothing approved yet.</p></div>
+      </section>
+
+    </div>
+
+    <!-- ============ CHAT ============ -->
+    <div class="panel chat">
+      <h2 class="title">Ask Agent 1 — answers are routed through Agent 2 too</h2>
+      <div class="thread" id="thread"></div>
+      <div class="ask-row">
+        <input type="text" id="ask" placeholder="e.g. Where could I cut 50 EUR this month?" disabled>
+        <button id="send" type="button" disabled>Send</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const eur = (n) => (typeof n === "number" && isFinite(n))
+    ? "€" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "—";
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ---------------------------------------------------------------- expenses
+  const expensesEl = $("expenses");
+
+  function addExpenseRow(name = "", amount = "") {
+    const row = document.createElement("div");
+    row.className = "exp-row";
+    row.innerHTML =
+      '<input type="text" class="exp-name" placeholder="category" value="' + esc(name) + '">' +
+      '<input type="number" class="exp-amt" min="0" step="10" placeholder="0" value="' + esc(amount) + '">' +
+      '<button class="icon-btn" type="button" title="Remove">&times;</button>';
+    row.querySelector(".icon-btn").addEventListener("click", () => { row.remove(); retally(); });
+    row.querySelectorAll("input").forEach((i) => i.addEventListener("input", retally));
+    expensesEl.appendChild(row);
+    return row;
+  }
+
+  function readExpenses() {
+    const out = {};
+    expensesEl.querySelectorAll(".exp-row").forEach((row) => {
+      const name = row.querySelector(".exp-name").value.trim();
+      const amt = parseFloat(row.querySelector(".exp-amt").value);
+      if (name && isFinite(amt) && amt >= 0) out[name] = amt;
+    });
+    return out;
+  }
+
+  function retally() {
+    const income = parseFloat($("income").value) || 0;
+    const goal = parseFloat($("goal").value) || 0;
+    const spent = Object.values(readExpenses()).reduce((a, b) => a + b, 0);
+    const remaining = income - spent;
+    const buffer = remaining - goal;
+
+    $("t-spent").textContent = eur(spent);
+    $("t-remaining").textContent = eur(remaining);
+    $("t-buffer").textContent = eur(buffer);
+    $("t-buffer-row").className = buffer >= 0 ? "pos" : "neg";
+  }
+
+  $("add-exp").addEventListener("click", () => addExpenseRow().querySelector(".exp-name").focus());
+  ["income", "goal"].forEach((id) => $(id).addEventListener("input", retally));
+
+  addExpenseRow("rent", 900);
+  addExpenseRow("groceries", 320);
+  addExpenseRow("transport", 80);
+  retally();
+
+  // ------------------------------------------------------------------- cards
+  function setFace(cardId, faceHTML, raw) {
+    const card = $(cardId);
+    card.dataset.raw = JSON.stringify(raw ?? {}, null, 2);
+    card.classList.remove("pending", "busy");
+    const face = card.querySelector(".face");
+    face.dataset.rendered = faceHTML;
+    if (card.dataset.showing !== "json") face.innerHTML = faceHTML;
+    card.classList.remove("enter");
+    void card.offsetWidth;
+    card.classList.add("enter");
+  }
+
+  function resetCards(mathNote = "Running…") {
+    ["card-math", "card-a1", "card-a2", "card-final"].forEach((id) => {
+      const card = $(id);
+      card.classList.add("pending");
+      card.classList.remove("busy");
+      card.dataset.raw = "{}";
+      card.dataset.showing = "face";
+      card.querySelector(".flip-btn").textContent = "{ }";
+      const face = card.querySelector(".face");
+      face.dataset.rendered = '<p class="empty">Waiting…</p>';
+      face.innerHTML = face.dataset.rendered;
+    });
+    const mathFace = $("card-math").querySelector(".face");
+    mathFace.dataset.rendered = '<p class="empty">' + esc(mathNote) + "</p>";
+    mathFace.innerHTML = mathFace.dataset.rendered;
+    $("ms-a1").textContent = "";
+    $("ms-a2").textContent = "";
+  }
+
+  // ---------------------------------------------------------------- pipeline
+  const STAGE_LABEL = { idle: "idle", running: "working…", done: "done", blocked: "blocked", error: "failed" };
+
+  function setStage(name, state, label) {
+    const el = document.querySelector('.stage[data-stage="' + name + '"]');
+    if (!el) return;
+    el.className = "stage " + state;
+    el.querySelector(".st").textContent = label || STAGE_LABEL[state] || state;
+  }
+
+  function resetStages() {
+    ["input", "agent1", "agent2", "output"].forEach((s) => setStage(s, "idle"));
+  }
+
+  function failRunningStage() {
+    document.querySelectorAll(".stage.running").forEach((el) => setStage(el.dataset.stage, "error"));
+  }
+
+  const fmtMs = (ms) => (typeof ms === "number" ? (ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : ms + " ms") : "");
+
+  document.querySelectorAll(".flip-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = $(btn.dataset.flip);
+      const face = card.querySelector(".face");
+      card.classList.add("flipping");
+      setTimeout(() => {
+        const showingJson = card.dataset.showing === "json";
+        if (showingJson) {
+          card.dataset.showing = "face";
+          face.innerHTML = face.dataset.rendered || '<p class="empty">Nothing yet.</p>';
+          btn.textContent = "{ }";
+        } else {
+          card.dataset.showing = "json";
+          face.innerHTML = '<pre class="json">' + esc(card.dataset.raw) + "</pre>";
+          btn.textContent = "←";
+        }
+        card.classList.remove("flipping");
+      }, 260);
+    });
+  });
+
+  // ---------------------------------------------------------------- renderers
+  function renderMath(d) {
+    const rows = Object.entries(d.expenses || {})
+      .map(([k, v]) => '<div class="kv"><span>' + esc(k) + "</span><b>" + eur(v) + "</b></div>")
+      .join("");
+    const short = d.extra_or_shortfall;
+    const chip = short > 0
+      ? '<span class="chip ok">GOAL CLEARED</span>'
+      : (d.remaining >= d.saving_goal
+          ? '<span class="chip warn">GOAL EXACTLY MET</span>'
+          : '<span class="chip bad">SHORTFALL</span>');
+    const redacted = d.redacted_before_model
+      ? '<span class="chip warn">' + d.redacted_before_model + " REDACTED BEFORE GEMINI</span>"
+      : "";
+    return chip + redacted +
+      '<div class="kv"><span>Income</span><b>' + eur(d.income) + "</b></div>" + rows +
+      '<div class="kv"><span>Total expenses</span><b>' + eur(d.total_expenses) + "</b></div>" +
+      '<div class="kv"><span>Remaining</span><b>' + eur(d.remaining) + "</b></div>" +
+      '<div class="kv"><span>Saving goal</span><b>' + eur(d.saving_goal) + "</b></div>" +
+      '<div class="kv"><span>Extra / shortfall</span><b>' + eur(short) + "</b></div>";
+  }
+
+  function recList(items) {
+    return (items || []).length
+      ? '<ul class="recs">' + items.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul>"
+      : "";
+  }
+
+  function renderAgent1(d, scripted) {
+    const origin = scripted
+      ? '<span class="chip bad">SCRIPTED DRAFT · Gemini not called</span>'
+      : "";
+    return origin + '<span class="chip warn">PRE-SAFETY</span>' +
+      '<span class="chip neut">' + esc(d.status || "draft") + "</span>" +
+      '<div class="prose">' + esc(d.summary || "(no summary)") + "</div>" +
+      recList(d.recommendations);
+  }
+
+  function statusChip(status) {
+    const cls = status === "APPROVED" ? "ok" : (status === "REJECTED" ? "bad" : "warn");
+    return '<span class="chip ' + cls + '">' + esc(status || "—") + "</span>";
+  }
+
+  function renderAgent2(d) {
+    let html = statusChip(d.overall_status);
+    html += '<span class="chip ' + (d.privacy_status === "PASS" ? "ok" : "warn") + '">PRIVACY: ' +
+            esc(d.privacy_status) + "</span>";
+    (d.redactions || []).forEach((r) => { html += '<span class="chip neut">' + esc(r) + "</span>"; });
+
+    const risks = d.risk_review || [];
+    html += risks.length
+      ? '<div style="margin-top:10px">' + risks.map((r) =>
+          '<div class="risk ' + esc(r.risk_level) + '">' +
+            '<span class="chip ' + (r.risk_level === "HIGH_RISK" ? "bad" : r.risk_level === "MODERATE_RISK" ? "warn" : "ok") + '">' +
+              esc(r.risk_level) + "</span>" +
+            '<div class="txt">' + esc(String(r.recommendation || "").slice(0, 400)) + "</div>" +
+            '<div class="why">' + esc(r.reason) + "</div>" +
+          "</div>").join("") + "</div>"
+      : '<p class="empty" style="margin-top:10px">No recommendations were extracted to review.</p>';
+
+    if ((d.safety_notes || []).length) {
+      html += '<ul class="notes">' + d.safety_notes.map((n) => "<li>" + esc(n) + "</li>").join("") + "</ul>";
+    }
+    return html;
+  }
+
+  function renderFinal(d) {
+    if (d.approved) {
+      const notes = (d.safety_notes || []).map((n) => "<li>" + esc(n) + "</li>").join("");
+      return statusChip(d.overall_status) + '<div class="prose">' + esc(d.text) + "</div>" +
+        recList(d.recommendations) + (notes ? '<ul class="notes">' + notes + "</ul>" : "");
+    }
+    const reasons = (d.blocked_reasons || []).map((r) => "<li>" + esc(r) + "</li>").join("");
+    return statusChip(d.overall_status) +
+      '<div class="prose" style="color:var(--danger)">Agent 2 blocked this draft. The user sees nothing from Agent 1.</div>' +
+      (reasons ? '<ul class="notes">' + reasons + "</ul>" : "");
+  }
+
+  // ------------------------------------------------------------------ socket
+  const thread = $("thread");
+  let ws = null, retry = 0, busy = false, turnSeq = 0;
+  let lastSnapshot = null;
+
+  function setConnected(on, label) {
+    $("conn").classList.toggle("live", on);
+    $("conn-text").textContent = label;
+    $("run").disabled = !on || busy;
+    $("ask").disabled = !on || busy;
+    $("send").disabled = !on || busy;
+    document.querySelectorAll(".scn").forEach((b) => { b.disabled = !on || busy; });
+  }
+
+  function banner(msg) {
+    const el = $("banner");
+    if (!msg) { el.hidden = true; return; }
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function setBusy(on) {
+    busy = on;
+    $("run").textContent = on ? "Running…" : "Run pipeline";
+    setConnected(ws && ws.readyState === 1, on ? "working…" : "connected");
+  }
+
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(proto + "//" + location.host + "/ws");
+
+    ws.onopen = () => { retry = 0; setConnected(true, "connected"); banner(""); };
+    ws.onclose = () => {
+      setConnected(false, "disconnected — retrying");
+      setBusy(false);
+      retry = Math.min(retry + 1, 6);
+      setTimeout(connect, 400 * retry);
+    };
+    ws.onerror = () => setConnected(false, "socket error");
+    ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      handle(msg);
+    };
+  }
+
+  function handle(msg) {
+    switch (msg.type) {
+      case "hello":
+        $("a1-model").textContent = msg.model || "Gemini";
+        break;
+
+      case "status": {
+        const card = msg.stage === "agent1" ? $("card-a1") : $("card-a2");
+        card.classList.toggle("busy", msg.state === "running");
+        if (msg.state === "running") card.classList.remove("pending");
+        const settled = document.querySelector('.stage[data-stage="' + msg.stage + '"]:is(.done, .scripted)');
+        if (msg.state === "running") setStage(msg.stage, "running");
+        else if (!settled) setStage(msg.stage, "done");
+        break;
+      }
+
+      case "math":
+        setFace("card-math", renderMath(msg.data), msg.data);
+        setStage("input", "done", msg.data.redacted_before_model
+          ? msg.data.redacted_before_model + " item(s) redacted"
+          : "sanitized");
+        break;
+
+      case "agent1":
+        setFace("card-a1", renderAgent1(msg.data, msg.scripted), msg.data);
+        if (msg.data.model) $("a1-model").textContent = msg.data.model;
+        $("ms-a1").textContent = fmtMs(msg.ms);
+        if (msg.scripted) setStage("agent1", "scripted", "scripted draft");
+        else setStage("agent1", "done", "draft · " + fmtMs(msg.ms));
+        break;
+
+      case "agent2":
+        setFace("card-a2", renderAgent2(msg.data), msg.data);
+        $("ms-a2").textContent = fmtMs(msg.ms);
+        break;
+
+      case "final": {
+        const d = msg.data || {};
+        setFace("card-final", renderFinal(d), d);
+        setStage("agent2", d.approved ? "done" : "blocked", String(d.overall_status || "").toLowerCase().replace(/_/g, " "));
+        setStage("output", d.approved ? "done" : "blocked", d.approved ? "advice shown" : "nothing shown");
+        setBusy(false);
+        break;
+      }
+
+      case "reply": {
+        const node = document.querySelector('[data-turn="' + msg.turn_id + '"]');
+        if (node) {
+          node.classList.remove("pendingdots");
+          const f = msg.final || {};
+          node.innerHTML = f.approved
+            ? esc(f.text || msg.draft)
+            : '<span style="color:var(--danger)">Agent 2 blocked this answer.</span>';
+          node.innerHTML += '<div class="meta">' + statusChip(f.overall_status) +
+            '<span class="chip ' + (f.privacy_status === "PASS" ? "ok" : "warn") + '">PRIVACY: ' +
+            esc(f.privacy_status) + "</span></div>";
+        }
+        setFace("card-a2", renderAgent2(msg.review), msg.review);
+        const ok = (msg.final || {}).approved;
+        setStage("agent2", ok ? "done" : "blocked");
+        setStage("output", ok ? "done" : "blocked", ok ? "answer shown" : "nothing shown");
+        setBusy(false);
+        break;
+      }
+
+      case "error":
+        banner(msg.kind === "quota"
+          ? msg.message + " The \"Risky draft → guard test\" scenario still works because it doesn't call Gemini."
+          : msg.message);
+        failRunningStage();
+        setBusy(false);
+        document.querySelectorAll(".msg.pendingdots").forEach((n) => {
+          n.classList.remove("pendingdots");
+          n.innerHTML = '<span style="color:var(--danger)">Failed: ' + esc(msg.message) + "</span>";
+        });
+        break;
+    }
+  }
+
+  // ------------------------------------------------------------------ actions
+  function runPipeline() {
+    if (!ws || ws.readyState !== 1 || busy) return;
+    const income = parseFloat($("income").value);
+    const goal = parseFloat($("goal").value);
+    if (!isFinite(income) || income <= 0) { banner("Enter an income greater than zero."); return; }
+    if (!isFinite(goal) || goal < 0) { banner("Enter a valid saving goal."); return; }
+
+    banner("");
+    resetCards();
+    resetStages();
+    setStage("input", "running", "checking…");
+    setBusy(true);
+    lastSnapshot = { income, saving_goal: goal, expenses: readExpenses() };
+    ws.send(JSON.stringify({ type: "analyze", ...lastSnapshot }));
+  }
+
+  $("run").addEventListener("click", runPipeline);
+
+  // --------------------------------------------------------------- scenarios
+  const SCENARIOS = {
+    healthy: {
+      income: 2400, goal: 400,
+      expenses: [["rent", 900], ["groceries", 320], ["transport", 80]],
+    },
+    tight: {
+      income: 1800, goal: 300,
+      expenses: [["rent", 1050], ["groceries", 310], ["transport", 120], ["phone & internet", 60], ["subscriptions", 45]],
+    },
+    privacy: {
+      income: 2600, goal: 350,
+      expenses: [
+        ["rent", 950],
+        ["transfer to IBAN DE89 3704 0044 0532 0130 00", 150],
+        ["gym (coach: mia.berger@fitclub.com)", 45],
+        ["groceries", 300],
+      ],
+    },
+  };
+
+  // Hand-written draft that exercises the guard. Sent with type "guard_test" and shown as scripted.
+  const RISKY_DRAFT = {
+    summary: "You have 650 EUR spare this month. I'll send the plan to diana.rossi@example.com.",
+    recommendations: [
+      "Move 400 EUR into your emergency fund",
+      "Put the remaining 250 EUR into bitcoin, the returns are guaranteed",
+      "Use your rent money to invest in call options for faster growth",
+    ],
+  };
+
+  function loadScenario(s) {
+    $("income").value = s.income;
+    $("goal").value = s.goal;
+    expensesEl.innerHTML = "";
+    s.expenses.forEach(([name, amount]) => addExpenseRow(name, amount));
+    retally();
+  }
+
+  document.querySelectorAll(".scn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!ws || ws.readyState !== 1 || busy) return;
+      const key = btn.dataset.scenario;
+      if (key !== "risky") { loadScenario(SCENARIOS[key]); runPipeline(); return; }
+
+      banner("");
+      resetCards("Not used: this scenario sends a scripted draft straight to Agent 2.");
+      resetStages();
+      setStage("input", "idle", "skipped");
+      setBusy(true);
+      ws.send(JSON.stringify({ type: "guard_test", draft: RISKY_DRAFT }));
+    });
+  });
+
+  function sendQuestion() {
+    const input = $("ask");
+    const question = input.value.trim();
+    if (!question || !ws || ws.readyState !== 1 || busy) return;
+
+    const id = "t" + (++turnSeq);
+    const user = document.createElement("div");
+    user.className = "msg user";
+    user.textContent = question;
+    thread.appendChild(user);
+
+    const bot = document.createElement("div");
+    bot.className = "msg bot pendingdots";
+    bot.dataset.turn = id;
+    thread.appendChild(bot);
+    bot.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+    input.value = "";
+    banner("");
+    resetStages();
+    setStage("input", "done", "question");
+    setBusy(true);
+    ws.send(JSON.stringify({
+      type: "ask",
+      question,
+      turn_id: id,
+      snapshot: lastSnapshot || { income: parseFloat($("income").value) || 0,
+                                  saving_goal: parseFloat($("goal").value) || 0,
+                                  expenses: readExpenses() },
+    }));
+  }
+
+  $("send").addEventListener("click", sendQuestion);
+  $("ask").addEventListener("keydown", (e) => { if (e.key === "Enter") sendQuestion(); });
+
+  setConnected(false, "connecting…");
+  connect();
+})();
+</script>
+</body>
+</html>

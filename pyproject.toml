@@ -3,17 +3,25 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "privacy-risk-guard"
-version = "0.1.0"
-description = "Flower AgentApp privacy and financial risk checkpoint"
+name = "finance-ai-agent"
+version = "0.2.0"
+description = "Two-agent personal finance assistant: Gemini advisor + privacy and financial risk guard"
 requires-python = ">=3.10"
 dependencies = [
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
     "flwr>=1.22.0",
     "openai>=1.30.0",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
+
+[tool.setuptools]
+packages = ["agent2"]
+py-modules = ["agent_1", "main", "server"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
